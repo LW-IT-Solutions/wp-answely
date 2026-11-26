@@ -4,9 +4,10 @@
  * orders" next to the Answely box and see their last five orders.
  *
  * Order data never leaves this site: the panel reads it from WordPress with
- * the customer's own login session. Answely only learns that the connection
- * exists (pairing) and is asked whether it is still active (signed request
- * without order data).
+ * the customer's own login session, without asking Answely. Answely only
+ * learns that the connection exists (pairing), once that the panel works for
+ * a signed-in customer, and when it is disconnected (signed requests without
+ * order data).
  *
  * @package Answely
  */
@@ -17,18 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Texts of the customer panel (English source; translations come from
- * translate.wordpress.org). The plugin download on answely.com additionally
- * ships selfservice-languages.json with the texts of the Answely account in
- * 60 languages; it is used when present.
+ * translate.wordpress.org).
  *
  * @return array<string,string>
  */
 function answely_customer_texts() {
-	static $t = null;
-	if ( null !== $t ) {
-		return $t;
-	}
-	$t    = array(
+	return array(
 		'ss_orders'            => __( 'My orders', 'answely' ),
 		'ss_pair_success'      => __( 'The shop is connected. Return to Answely to check the setup status.', 'answely' ),
 		'ss_wp_install'        => __( 'In your Answely account, create a one-time connection code for WooCommerce and paste it here.', 'answely' ),
@@ -46,22 +41,6 @@ function answely_customer_texts() {
 		'ss_session_note'      => __( 'Order details are loaded only after you request them and are cleared when the panel closes.', 'answely' ),
 		'ss_logout'            => __( 'Sign out', 'answely' ),
 	);
-	$file = __DIR__ . '/selfservice-languages.json';
-	if ( is_readable( $file ) && function_exists( 'wp_json_file_decode' ) ) {
-		$all = wp_json_file_decode( $file, array( 'associative' => true ) );
-		$lc  = strtolower( str_replace( '_', '-', function_exists( 'determine_locale' ) ? determine_locale() : get_locale() ) );
-		if ( is_array( $all ) && ! isset( $all[ $lc ] ) ) {
-			$lc = explode( '-', $lc )[0];
-		}
-		if ( 'en' !== $lc && is_array( $all ) && isset( $all[ $lc ] ) && is_array( $all[ $lc ] ) ) {
-			foreach ( $t as $k => $v ) {
-				if ( isset( $all[ $lc ][ $k ] ) && is_string( $all[ $lc ][ $k ] ) && '' !== $all[ $lc ][ $k ] ) {
-					$t[ $k ] = $all[ $lc ][ $k ];
-				}
-			}
-		}
-	}
-	return $t;
 }
 
 /**
@@ -300,15 +279,17 @@ function answely_customer_unseal_text( $stored ) {
 }
 
 /**
- * Signed request to Answely: verify, status or disconnect. Contains no order
- * or customer data.
+ * Signed request to Answely: "verify" (sent once, after the panel worked for
+ * a signed-in customer for the first time, so that the setup status in the
+ * Answely account shows it) or "disconnect". Contains no order or customer
+ * data. The result never decides whether orders are shown.
  *
  * @param array  $c         Stored connection.
- * @param string $operation verify|status|disconnect.
+ * @param string $operation verify|disconnect.
  * @return bool
  */
 function answely_customer_central( array $c, $operation ) {
-	$allowed = array( 'https://' . ANSWELY_HOST, 'https://dev.' . ANSWELY_HOST );
+	$allowed = array_unique( array( 'https://answely.com', answely_service()['app'] ) );
 	if ( ! in_array( $c['environment'] ?? '', $allowed, true ) || empty( $c['pair_secret'] ) || ! is_string( $c['pair_secret'] ) ) {
 		return false;
 	}
@@ -359,10 +340,6 @@ function answely_customer_orders() {
 		wp_send_json( array( 'error' => 'unavailable' ), 403 );
 		return;
 	}
-	if ( ! answely_customer_central( $c, 'status' ) ) {
-		wp_send_json( array( 'error' => 'unavailable' ), 403 );
-		return;
-	}
 	$uid    = get_current_user_id();
 	$orders = wc_get_orders(
 		array(
@@ -410,17 +387,15 @@ function answely_customer_enqueue() {
 		return;
 	}
 	wp_enqueue_script( 'answely-customer-panel', plugins_url( 'customer-panel.js', __FILE__ ), array(), ANSWELY_VERSION, true );
-	wp_localize_script(
-		'answely-customer-panel',
-		'AnswelyCustomerPanel',
-		array(
-			'endpoint' => admin_url( 'admin-ajax.php' ),
-			'action'   => 'answely_customer_orders',
-			'nonce'    => wp_create_nonce( 'answely_customer_orders' ),
-			'login'    => wc_get_page_permalink( 'myaccount' ),
-			'logout'   => is_user_logged_in() ? wp_logout_url( home_url( '/' ) ) : '',
-			'labels'   => answely_customer_texts(),
-		)
+	// wp_logout_url() returns the address HTML-escaped ("&amp;"); the script needs it plain.
+	$data = array(
+		'endpoint' => html_entity_decode( admin_url( 'admin-ajax.php' ), ENT_QUOTES, 'UTF-8' ),
+		'action'   => 'answely_customer_orders',
+		'nonce'    => wp_create_nonce( 'answely_customer_orders' ),
+		'login'    => html_entity_decode( (string) wc_get_page_permalink( 'myaccount' ), ENT_QUOTES, 'UTF-8' ),
+		'logout'   => is_user_logged_in() ? html_entity_decode( wp_logout_url( home_url( '/' ) ), ENT_QUOTES, 'UTF-8' ) : '',
+		'labels'   => answely_customer_texts(),
 	);
+	wp_add_inline_script( 'answely-customer-panel', 'window.AnswelyCustomerPanel = ' . wp_json_encode( $data ) . ';', 'before' );
 }
 add_action( 'wp_enqueue_scripts', 'answely_customer_enqueue' );

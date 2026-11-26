@@ -1,10 +1,10 @@
 === Answely – AI Answers for Site Search ===
 Contributors: lwitsolutions
 Tags: search, ai, answers, site search, faq
-Requires at least: 6.0
+Requires at least: 6.3
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,14 +23,15 @@ This plugin connects your WordPress site to your Answely account. You need an An
 * **Answer field block and shortcode:** add a question field that shows the answer right below it, for example on a help or FAQ page: the block "Answely answer field" or `[answely]`. Without JavaScript or Answely it falls back to the normal search results page.
 * **Where to load:** on every page, or only on search results and pages with the answer field.
 * **Language:** follows the language of each page (works with Polylang and WPML) or a fixed language.
-* **Consent:** optionally load nothing until the visitor agrees. IAB TCF v2 and consented.eu are detected automatically; the plugin also takes consent from the WP Consent API (Complianz, CookieYes, Cookiebot and others) and offers a filter for any other tool.
+* **Consent:** optionally wait for the visitor's consent: the Answely script file is still loaded, but it fetches neither its configuration nor any answer before the visitor agrees. IAB TCF v2 and consented.eu are detected automatically; the plugin also takes consent from the WP Consent API (Complianz, CookieYes, Cookiebot and others) and offers a filter for any other tool.
 * **Content sync (optional, Pro plan or higher):** sends new, changed and removed public content right away through the Answely Push API, with content type selection, excluded paths, a per-page exclusion, noindex detection (Yoast SEO, Rank Math, SEOPress), retries and index status.
 * **Customer orders (optional, WooCommerce):** signed-in customers can open "My orders" next to the answer box. Order data stays on your site.
 
 = Privacy =
 
 * The plugin and the Answely box set no cookies and use no visitor identifier.
-* The box sends the question, the language, the address of the page and the referring page (both without parameters) to Answely. By default Answely stores neither questions nor answers.
+* On every page where it loads, the visitor's browser requests the Answely script file, and the script fetches the configuration of the box (site key and language) from Answely. With "Wait for consent", the script file is still requested, but the configuration and answers are fetched only after the visitor agrees.
+* When a visitor searches or asks, the box sends the question, the language, the site key, the address of the page and the referring page (both without parameters) to Answely; for follow-up questions optionally also earlier questions and answers of the same box. By default Answely stores neither questions nor answers.
 * Answely processes data on servers in the EU.
 * Mention Answely in your privacy policy; text modules are in your Answely account.
 
@@ -38,13 +39,13 @@ This plugin connects your WordPress site to your Answely account. You need an An
 
 This plugin connects to Answely, an AI answer service operated by LW IT Solutions (Answely). Terms of use: https://answely.com/en/legal/terms – Privacy policy: https://answely.com/en/legal/privacy – Data processing agreement: https://answely.com/en/legal/dpa
 
-1. **Answer script for visitors** (`https://cdn.answely.com/answely.js`): loaded on the pages of your site once you have saved a site key (on every page, or only on search results and answer field pages, as you choose; with "Wait for consent" only after the visitor agrees). When a visitor searches or asks, the script sends the question (at most 300 characters), the language, your site key, the page address and the referring page address (both without parameters) to `https://api.answely.com`. Optionally, earlier questions and answers of the same box are sent for follow-up questions. No cookies are set.
+1. **Answer script for visitors** (`https://cdn.answely.com/answely.js`): loaded on the pages of your site once you have saved a site key (on every page, or only on search results and answer field pages, as you choose). The visitor's browser requests the script file like any file from another host, which transmits the IP address, the user agent and, as far as the browser's referrer policy allows, the address of the page; this also happens with "Wait for consent". On each page where it is loaded, the script then fetches the configuration of the box from `https://api.answely.com` (site key and language); with "Wait for consent" it fetches the configuration and answers only after the visitor agrees. When a visitor searches or asks, the script sends the question (at most 300 characters), the language, your site key, the page address and the referring page address (both without parameters) to `https://api.answely.com`. Optionally, earlier questions and answers of the same box are sent for follow-up questions. No cookies are set.
 2. **Connection check** (`https://api.answely.com`): only when an administrator clicks "Check connection". Sends the site key and the language; returns whether Answely answers for the site.
 3. **Test question** (`https://api.answely.com`): only when an administrator asks a test question in the admin. Sends the question, the language and the site key. A generated answer counts towards the monthly quota of your plan.
-4. **Content sync** (`https://api.answely.com`): only after an administrator switches it on and sets a push token. When public content of the selected types is published, changed, unpublished or deleted, your server sends its address, title, plain text and language (or a deletion request for the address) with the push token. "Check index status" sends a status request with the push token.
-5. **Customer orders** (`https://answely.com`): only with WooCommerce and after an administrator enters a one-time connection code. Pairing sends the code and your site address; Answely then reads the public route `/wp-json/answely/v1/connection` of your site (site key, whether WooCommerce is active, and during pairing a hash of the code). When a signed-in customer opens "My orders", your server sends a signed status request containing only the site key, the time and the kind of request (a status request, and once, the first time after pairing, a second request confirming that it worked); the same signed request is sent when an administrator disconnects the customer orders. Order data is never sent to Answely.
+4. **Content sync** (`https://api.answely.com`): only after an administrator switches it on and sets a push token. When public content of the selected types is published, changed, unpublished or deleted, your server sends its address, title, plain text and language (or a deletion request for the address) with the push token. Switching the sync off, or changing the selection so that content is no longer sent, sends a deletion request for each address sent before. Queued deliveries and deletion requests are sent in the background through WP-Cron and continue after the plugin is deactivated and activated again. "Check index status" sends a status request with the push token.
+5. **Customer orders** (`https://answely.com`): only with WooCommerce and after an administrator enters a one-time connection code. Pairing sends the code and your site address; Answely then reads the public route `/wp-json/answely/v1/connection` of your site (site key, whether WooCommerce is active, whether the customer panel is connected and, only during pairing, a hash of the code). Once, the first time a signed-in customer opens "My orders" after pairing, your server sends a signed request confirming that the panel works; when an administrator disconnects the customer orders, it sends a signed disconnect request. These two requests contain only the site key, the time, the kind of request and whether it confirms the pairing. Showing the orders does not depend on Answely: they are read from WooCommerce on your site and are never sent to Answely.
 
-The plugin makes no other requests and contains no tracking. For development only, a developer can point the plugin to the Answely development host `https://dev.answely.com` by setting the constant `ANSWELY_API_BASE` in wp-config.php; without that constant this host is never contacted.
+The plugin makes no other requests and contains no tracking. As with every request WordPress makes, requests from your server carry the WordPress version and the address of your site in the user agent. A developer can point the plugin to another Answely installation (for example a test installation) by defining the constant `ANSWELY_API_BASE` in wp-config.php; without that constant only the answely.com hosts above are contacted.
 
 == Installation ==
 
@@ -93,6 +94,13 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 
 == Changelog ==
 
+= 1.3.1 =
+* Readme and settings texts describe exactly what is sent and when, including the configuration request of the script and what "Wait for consent" does.
+* Customer orders are shown without asking Answely first; Answely is only told once that the panel works and when it is disconnected.
+* The JavaScript of the settings page, the block and the answer field is now in readable files.
+* The service address can only be changed with the ANSWELY_API_BASE constant in wp-config.php; the test question waits at most 30 seconds; content sync works without the mbstring extension.
+* Requires WordPress 6.3 (block API version 3).
+
 = 1.3.0 =
 * New settings page with tabs, setup checklist, connection check and test question.
 * New: answer field block and `[answely]` shortcode.
@@ -112,6 +120,9 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 * First version: site key, consent mode, script tag in the page head.
 
 == Upgrade Notice ==
+
+= 1.3.1 =
+Clearer privacy texts, customer orders without a status request to Answely, readable JavaScript files. Requires WordPress 6.3.
 
 = 1.3.0 =
 New settings page with connection check, test question, answer field block and more consent and sync options. Existing settings are kept.

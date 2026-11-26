@@ -3,8 +3,8 @@
  * Plugin Name:       Answely – AI Answers for Site Search
  * Plugin URI:        https://answely.com/
  * Description:       Short AI answers with sources above your site search results. Adds the Answely script with your site key, an answer field block and shortcode, consent handling and an optional synchronization of public content.
- * Version:           1.3.0
- * Requires at least: 6.0
+ * Version:           1.3.1
+ * Requires at least: 6.3
  * Requires PHP:      7.4
  * Author:            Answely
  * License:           GPLv2 or later
@@ -18,45 +18,53 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const ANSWELY_VERSION = '1.3.0';
+const ANSWELY_VERSION = '1.3.1';
 const ANSWELY_OPTION  = 'answely';
-
-/*
- * Service addresses, all derived from one host name. The development service
- * is the same host with the prefix "dev."; it is assembled at runtime on
- * purpose: the Answely deployment replaces the literal development host name
- * with the production host name in all files, which would otherwise remove
- * the development option from the published plugin.
- */
-const ANSWELY_HOST = 'answely.com';
 
 /**
  * Addresses of the Answely service this site talks to.
  *
- * Production by default. Answely staff can point a test site at the Answely
- * development service by defining ANSWELY_API_BASE in wp-config.php as the
- * development host ("https://dev." followed by the Answely host name). Any
- * other value is ignored.
+ * Always the answely.com hosts. Only a developer can point a test site at
+ * another Answely installation by defining ANSWELY_API_BASE in wp-config.php
+ * as its HTTPS address (scheme and host, no path); any other value is
+ * ignored.
  *
  * @return array{environment:string, api:string, app:string, script:string}
  */
 function answely_service() {
-	$dev = 'https://dev.' . ANSWELY_HOST;
-	$api = defined( 'ANSWELY_API_BASE' ) && is_string( ANSWELY_API_BASE ) ? untrailingslashit( ANSWELY_API_BASE ) : '';
-	if ( $api === $dev ) {
+	$base = defined( 'ANSWELY_API_BASE' ) && is_string( ANSWELY_API_BASE ) ? answely_service_base( ANSWELY_API_BASE ) : '';
+	if ( '' !== $base ) {
 		return array(
-			'environment' => 'dev',
-			'api'         => $dev,
-			'app'         => $dev,
-			'script'      => $dev . '/cdn/answely.js',
+			'environment' => 'custom',
+			'api'         => $base,
+			'app'         => $base,
+			'script'      => $base . '/cdn/answely.js',
 		);
 	}
 	return array(
 		'environment' => 'live',
-		'api'         => 'https://api.' . ANSWELY_HOST,
-		'app'         => 'https://' . ANSWELY_HOST,
-		'script'      => 'https://cdn.' . ANSWELY_HOST . '/answely.js',
+		'api'         => 'https://api.answely.com',
+		'app'         => 'https://answely.com',
+		'script'      => 'https://cdn.answely.com/answely.js',
 	);
+}
+
+/**
+ * Validates the ANSWELY_API_BASE constant: an HTTPS address with a host and
+ * nothing else.
+ *
+ * @param string $value Value of the constant.
+ * @return string The address without trailing slash, '' if not usable.
+ */
+function answely_service_base( $value ) {
+	$parts = wp_parse_url( trim( $value ) );
+	if ( ! is_array( $parts ) || ! isset( $parts['scheme'], $parts['host'] ) || 'https' !== strtolower( $parts['scheme'] )
+		|| isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] )
+		|| ( isset( $parts['path'] ) && '' !== trim( $parts['path'], '/' ) ) ) {
+		return '';
+	}
+	$base = 'https://' . strtolower( $parts['host'] ) . ( isset( $parts['port'] ) ? ':' . (int) $parts['port'] : '' );
+	return in_array( $base, array( 'https://answely.com', 'https://api.answely.com', 'https://cdn.answely.com' ), true ) ? '' : $base;
 }
 
 /**
@@ -259,7 +267,7 @@ add_action( 'wp_enqueue_scripts', 'answely_enqueue_script' );
 function answely_script_attributes( array $e ) {
 	$service = answely_service();
 	$attr    = array( 'data-site-key' => $e['key'] );
-	if ( 'dev' === $service['environment'] ) {
+	if ( 'custom' === $service['environment'] ) {
 		$attr['data-api'] = $service['api'];
 	}
 	if ( '' !== $e['locale'] ) {
@@ -272,7 +280,7 @@ function answely_script_attributes( array $e ) {
 }
 
 /**
- * Adds the data attributes (and async on WordPress before 6.3) to the tag.
+ * Adds the data attributes (and async, if the tag has none) to the tag.
  *
  * @param string $tag    Script HTML.
  * @param string $handle Handle.
@@ -366,19 +374,7 @@ add_shortcode( 'answely', 'answely_shortcode' );
  * Front-end assets of the answer field and the block.
  */
 function answely_register_field_assets() {
-	wp_register_script( 'answely-ask', false, array(), ANSWELY_VERSION, true );
-	wp_add_inline_script(
-		'answely-ask',
-		'document.addEventListener("submit",function(e){var f=e.target;'
-		. 'if(!f||!f.matches||!f.matches("form[data-answely-ask]"))return;'
-		. 'var i=f.querySelector("input[name=answely_q]"),q=i?String(i.value||"").trim().slice(0,300):"";'
-		. 'var A=window.Answely,box=f.parentNode.querySelector(".answely-ask__answer");'
-		// Answer in place only when Answely is ready (configuration loaded, consent
-		// given); otherwise the form opens the normal search results page.
-		. 'if(!q||!A||typeof A.frage!=="function"||!box)return;var ok=true;'
-		. 'try{if(typeof A.diagnose==="function"){ok=!!A.diagnose().ready;}}catch(x){ok=false;}'
-		. 'if(ok){e.preventDefault();A.frage(q,box);}});'
-	);
+	wp_register_script( 'answely-ask', plugins_url( 'answer-field.js', __FILE__ ), array(), ANSWELY_VERSION, true );
 	wp_register_style( 'answely-ask', false, array(), ANSWELY_VERSION );
 	wp_add_inline_style(
 		'answely-ask',
@@ -391,7 +387,7 @@ function answely_register_field_assets() {
 		. '.answely-ask__answer{margin-top:.75em}'
 	);
 
-	wp_register_script( 'answely-block-editor', false, array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor' ), ANSWELY_VERSION, true );
+	wp_register_script( 'answely-block-editor', plugins_url( 'block-editor.js', __FILE__ ), array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor' ), ANSWELY_VERSION, true );
 	$texts = array(
 		'title'       => __( 'Answely answer field', 'answely' ),
 		'description' => __( 'A question field that shows the Answely answer right below it. Without Answely it opens the normal search results.', 'answely' ),
@@ -404,25 +400,7 @@ function answely_register_field_assets() {
 		'note'        => __( 'Answers appear on the published page.', 'answely' ),
 		'settings'    => __( 'Answer field', 'answely' ),
 	);
-	wp_add_inline_script(
-		'answely-block-editor',
-		'(function(wp,t){var el=wp.element.createElement,be=wp.blockEditor,C=wp.components;'
-		. 'wp.blocks.registerBlockType("answely/ask",{apiVersion:3,title:t.title,description:t.description,icon:"search",category:"widgets",'
-		. 'keywords:["answely","ai","search","answer"],supports:{html:false},'
-		. 'attributes:{label:{type:"string",default:""},placeholder:{type:"string",default:""},button:{type:"string",default:""}},'
-		. 'edit:function(p){var a=p.attributes,set=function(k){return function(v){var o={};o[k]=v;p.setAttributes(o);};};'
-		. 'var bp=be.useBlockProps?be.useBlockProps({className:"answely-ask"}):{className:"answely-ask"};'
-		. 'return el("div",bp,'
-		. 'el(be.InspectorControls,null,el(C.PanelBody,{title:t.settings},'
-		. 'el(C.TextControl,{label:t.label,value:a.label,placeholder:t.defLabel,onChange:set("label")}),'
-		. 'el(C.TextControl,{label:t.placeholder,value:a.placeholder,placeholder:t.defPh,onChange:set("placeholder")}),'
-		. 'el(C.TextControl,{label:t.button,value:a.button,placeholder:t.defButton,onChange:set("button")}))),'
-		. 'el("label",{className:"answely-ask__label"},a.label||t.defLabel),'
-		. 'el("div",{className:"answely-ask__row"},el("input",{className:"answely-ask__input",type:"text",readOnly:true,placeholder:a.placeholder||t.defPh}),'
-		. 'el("button",{className:"answely-ask__button wp-element-button",type:"button"},a.button||t.defButton)),'
-		. 'el("p",{style:{fontSize:"12px",opacity:.7}},t.note));},'
-		. 'save:function(){return null;}});})(window.wp,' . wp_json_encode( $texts ) . ');'
-	);
+	wp_add_inline_script( 'answely-block-editor', 'window.answelyBlockTexts = ' . wp_json_encode( $texts ) . ';', 'before' );
 
 	register_block_type(
 		'answely/ask',
@@ -668,7 +646,7 @@ function answely_admin_assets( $hook ) {
 		. '@media (max-width:782px){.answely-card{padding:4px 12px 12px}.answely-inline .button{margin-top:4px}}'
 	);
 
-	wp_register_script( 'answely-admin', false, array(), ANSWELY_VERSION, true );
+	wp_register_script( 'answely-admin', plugins_url( 'admin.js', __FILE__ ), array(), ANSWELY_VERSION, true );
 	wp_enqueue_script( 'answely-admin' );
 	$texts = array(
 		'ajax'    => admin_url( 'admin-ajax.php' ),
@@ -679,40 +657,7 @@ function answely_admin_assets( $hook ) {
 		'sources' => __( 'Sources', 'answely' ),
 		'copied'  => __( 'Copied', 'answely' ),
 	);
-	wp_add_inline_script(
-		'answely-admin',
-		'(function(d,c,w){"use strict";'
-		// Tabs: every panel is in the page; without JavaScript all are shown.
-		. 'var tabs=[].slice.call(d.querySelectorAll(".answely-wrap .nav-tab[data-tab]")),panels=[].slice.call(d.querySelectorAll(".answely-panel"));'
-		. 'function show(id,focus){var ok=false;tabs.forEach(function(t){var on=t.getAttribute("data-tab")===id;ok=ok||on;t.classList.toggle("nav-tab-active",on);t.setAttribute("aria-selected",on?"true":"false");});'
-		. 'if(!ok)return;panels.forEach(function(p){p.hidden=p.id!=="answely-"+id;});try{sessionStorage.setItem("answely-tab",id);}catch(e){}'
-		. 'if(focus&&history.replaceState)history.replaceState(null,"","#"+id);}'
-		. 'tabs.forEach(function(t){t.addEventListener("click",function(e){e.preventDefault();show(t.getAttribute("data-tab"),true);});});'
-		. 'var start=(location.hash||"").slice(1);if(!start){try{start=sessionStorage.getItem("answely-tab")||"";}catch(e){}}'
-		. 'w.addEventListener("hashchange",function(){var h=(location.hash||"").slice(1);if(h)show(h,false);});'
-		. 'show(start||"connection",false);if(!d.querySelector(".nav-tab-active")&&tabs[0])show(tabs[0].getAttribute("data-tab"),false);'
-		// Rendering helpers: model text only ever as text, links only to allowed hosts.
-		. 'function box(el,cls,text){el.hidden=false;el.className="answely-result "+(cls||"");el.textContent=text||"";}'
-		. 'function link(u){try{var x=new URL(u);if((x.protocol==="https:"||x.protocol==="http:")&&!x.username&&!x.password&&c.hosts.indexOf(x.hostname.toLowerCase())>=0)return x.href;}catch(e){}return "";}'
-		. 'function post(action,data,out,btn,done){var f=new FormData();f.append("action",action);f.append("nonce",c.nonce);Object.keys(data||{}).forEach(function(k){f.append(k,data[k]);});'
-		. 'box(out,"",c.working);if(btn)btn.disabled=true;'
-		. 'fetch(c.ajax,{method:"POST",body:f,credentials:"same-origin"}).then(function(r){return r.json();}).then(function(j){if(!j||typeof j!=="object"||!j.data)throw Error("x");done(j.data,!!j.success);})'
-		. '.catch(function(){box(out,"is-bad",c.failed);}).then(function(){if(btn)btn.disabled=false;});}'
-		. 'function show2(out,r){box(out,r.level==="ok"?"is-ok":(r.level==="warn"?"is-warn":"is-bad"),String(r.message||""));'
-		. 'if(Array.isArray(r.details)&&r.details.length){var ul=d.createElement("ul");r.details.forEach(function(x){var li=d.createElement("li");li.textContent=String(x);ul.appendChild(li);});out.appendChild(ul);}}'
-		. 'd.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-answely-action]"):null;if(!b)return;var a=b.getAttribute("data-answely-action"),out=d.getElementById(b.getAttribute("aria-controls"));'
-		. 'if(a==="copy"){var t=d.getElementById(b.getAttribute("data-copy"));if(t&&navigator.clipboard){navigator.clipboard.writeText(t.textContent).then(function(){b.textContent=c.copied;});}return;}'
-		. 'if(!out)return;e.preventDefault();'
-		. 'if(a==="check"||a==="index"||a==="sync_now"){post("answely_"+a,{},out,b,function(r){show2(out,r);});return;}'
-		. 'if(a==="test"){var q=d.getElementById("answely-test-q");var v=q?q.value.trim():"";if(!v){q&&q.focus();return;}'
-		. 'post("answely_test",{q:v},out,b,function(r){if(!r.answer){show2(out,r);return;}'
-		. 'box(out,r.level==="ok"?"is-ok":"is-warn","");var p=d.createElement("p");p.textContent=String(r.answer);out.appendChild(p);'
-		. 'if(Array.isArray(r.sources)&&r.sources.length){var h=d.createElement("strong");h.textContent=c.sources;out.appendChild(h);var ul=d.createElement("ul");'
-		. 'r.sources.forEach(function(s){var li=d.createElement("li"),u=link(s.url);if(u){var l=d.createElement("a");l.href=u;l.target="_blank";l.rel="noopener noreferrer";l.textContent=String(s.title||u);li.appendChild(l);}else{li.textContent=String(s.title||"");}ul.appendChild(li);});out.appendChild(ul);}'
-		. 'if(r.note){var n=d.createElement("p");n.className="description";n.textContent=String(r.note);out.appendChild(n);}});}});'
-		. 'var tq=d.getElementById("answely-test-q");if(tq)tq.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();var b=d.querySelector("[data-answely-action=test]");if(b)b.click();}});'
-		. '})(document,' . wp_json_encode( $texts ) . ',window);'
-	);
+	wp_add_inline_script( 'answely-admin', 'window.answelyAdmin = ' . wp_json_encode( $texts ) . ';', 'before' );
 }
 
 /**
@@ -835,7 +780,7 @@ function answely_check_connection() {
 			}
 			if ( $account_consent && ! $e['zustimmung'] ) {
 				$out['level'] = 'warn';
-				$details[]    = __( 'Your Answely account requires consent before answers. Also switch on "Wait for consent" under Display & privacy, so that nothing is loaded before the visitor agrees.', 'answely' );
+				$details[]    = __( 'Your Answely account requires consent before answers. Also switch on "Wait for consent" under Display & privacy, so that the box fetches neither its configuration nor answers before the visitor agrees.', 'answely' );
 			}
 		} else {
 			$out = array(
@@ -990,7 +935,7 @@ function answely_ajax_test() {
 	$res     = wp_remote_post(
 		$service['api'] . '/v1/search/' . rawurlencode( $e['key'] ) . '/answer',
 		array(
-			'timeout'             => 60,
+			'timeout'             => 30,
 			'redirection'         => 0,
 			'limit_response_size' => 262144,
 			'headers'             => array(
@@ -1056,8 +1001,8 @@ function answely_seite() {
 	$tabs['help'] = __( 'Help', 'answely' );
 
 	echo '<div class="wrap answely-wrap"><h1>Answely';
-	if ( 'dev' === $service['environment'] ) {
-		echo '<span class="answely-badge">' . esc_html__( 'Development service', 'answely' ) . '</span>';
+	if ( 'custom' === $service['environment'] ) {
+		echo '<span class="answely-badge">' . esc_html__( 'Service address from ANSWELY_API_BASE', 'answely' ) . '</span>';
 	}
 	echo '</h1>';
 	settings_errors( ANSWELY_OPTION );
@@ -1190,8 +1135,8 @@ function answely_tab_display( array $e ) {
 	echo '<p>' . esc_html__( 'The Answely box sets no cookies and stores no visitor identifier. Whether you ask for consent depends on your privacy assessment; the privacy text modules in your Answely account help.', 'answely' ) . '</p>';
 	echo '<table class="form-table" role="presentation">';
 	echo '<tr><th scope="row">' . esc_html__( 'Wait for consent', 'answely' ) . '</th><td><label><input type="checkbox" name="answely[zustimmung]" value="1"' . checked( $e['zustimmung'], true, false ) . '> ';
-	echo esc_html__( 'Load nothing from Answely until the visitor has agreed', 'answely' ) . '</label>';
-	echo '<p class="description">' . esc_html__( 'The script is still included, but it does not fetch its configuration or any answer before consent. IAB TCF v2 (purpose 1) and consented.eu are detected automatically.', 'answely' ) . '</p></td></tr>';
+	echo esc_html__( 'Fetch no configuration and no answer from Answely until the visitor has agreed', 'answely' ) . '</label>';
+	echo '<p class="description">' . esc_html__( 'The script file is still loaded from cdn.answely.com: the browser of the visitor requests it like any file from another host, which transmits the IP address and the user agent. Before consent the script fetches neither its configuration nor any answer from api.answely.com. IAB TCF v2 (purpose 1) and consented.eu are detected automatically.', 'answely' ) . '</p></td></tr>';
 	echo '<tr><th scope="row">' . esc_html__( 'WP Consent API', 'answely' ) . '</th><td><label><input type="checkbox" name="answely[wp_consent]" value="1"' . checked( $e['wp_consent'], true, false ) . '> ';
 	echo esc_html__( 'Take consent from the WP Consent API', 'answely' ) . '</label> ';
 	echo '<label for="answely-category" class="screen-reader-text">' . esc_html__( 'Consent category', 'answely' ) . '</label><select id="answely-category" name="answely[consent_category]">';
@@ -1229,7 +1174,8 @@ function answely_tab_help( array $service ) {
 	echo '<h2>' . esc_html__( 'How Answely works on your site', 'answely' ) . '</h2>';
 	echo '<ol>';
 	echo '<li>' . esc_html__( 'Answely reads the public pages of your verified domain (crawling, or the content sync of this plugin) and builds a search index.', 'answely' ) . '</li>';
-	echo '<li>' . esc_html__( 'When a visitor searches, the box sends the question, the language, the page address and the referring page address (both without parameters) to Answely. Answely answers only from sections of your site that back the answer and lists them as sources. Every answer is labelled as AI-generated.', 'answely' ) . '</li>';
+	echo '<li>' . esc_html__( 'On every page where it loads, the box fetches its configuration (site key and language) from Answely; with "Wait for consent" only after the visitor agrees.', 'answely' ) . '</li>';
+	echo '<li>' . esc_html__( 'When a visitor searches, the box sends the question, the language, the site key, the page address and the referring page address (both without parameters) to Answely, for follow-up questions optionally also earlier questions and answers of the same box. Answely answers only from sections of your site that back the answer and lists them as sources. Every answer is labelled as AI-generated.', 'answely' ) . '</li>';
 	echo '<li>' . esc_html__( 'Your search keeps working at all times; if Answely is unavailable, the box simply does not appear.', 'answely' ) . '</li>';
 	echo '</ol>';
 	echo '<h2>' . esc_html__( 'Troubleshooting', 'answely' ) . '</h2><ul class="ul-disc">';

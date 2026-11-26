@@ -280,6 +280,25 @@ function answely_sync_language( $id ) {
 }
 
 /**
+ * Cuts UTF-8 text to at most $bytes bytes without splitting a character.
+ * WordPress has no fallback for mb_strcut(), so without mbstring the last
+ * (possibly incomplete) multibyte character is dropped instead.
+ *
+ * @param string $text  Text.
+ * @param int    $bytes Maximum length in bytes.
+ * @return string
+ */
+function answely_sync_cut( $text, $bytes ) {
+	if ( strlen( $text ) <= $bytes ) {
+		return $text;
+	}
+	if ( function_exists( 'mb_strcut' ) ) {
+		return mb_strcut( $text, 0, $bytes, 'UTF-8' );
+	}
+	return (string) preg_replace( '/[\xC0-\xFF][\x80-\xBF]*$/', '', substr( $text, 0, $bytes ) );
+}
+
+/**
  * The document sent for a post, or null if it has no text.
  *
  * @param WP_Post $p   Post.
@@ -297,7 +316,7 @@ function answely_sync_dokument( $p, $url ) {
 	$doc = array(
 		'url'          => $url,
 		'titel'        => mb_substr( trim( html_entity_decode( wp_strip_all_tags( get_the_title( $p ) ), ENT_QUOTES, 'UTF-8' ) ), 0, 300 ),
-		'text'         => mb_strcut( $text, 0, 900000, 'UTF-8' ),
+		'text'         => answely_sync_cut( $text, 900000 ),
 		'sprache'      => answely_sync_language( $p->ID ),
 		'sichtbarkeit' => 'oeffentlich',
 	);
