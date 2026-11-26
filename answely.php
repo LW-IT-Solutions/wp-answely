@@ -3,7 +3,7 @@
  * Plugin Name:       Answely – AI Answers for Site Search
  * Plugin URI:        https://answely.com/
  * Description:       Short AI answers with sources above your site search results. Adds the Answely script with your site key, an answer field block and shortcode, consent handling and an optional synchronization of public content.
- * Version:           1.3.1
+ * Version:           1.4.0
  * Requires at least: 6.3
  * Requires PHP:      7.4
  * Author:            Answely
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const ANSWELY_VERSION = '1.3.1';
+const ANSWELY_VERSION = '1.4.0';
 const ANSWELY_OPTION  = 'answely';
 
 /**
@@ -379,12 +379,15 @@ function answely_register_field_assets() {
 	wp_add_inline_style(
 		'answely-ask',
 		'.answely-ask{margin:1.5em 0;max-width:100%}'
-		. '.answely-ask__label{display:block;font-weight:600;margin-bottom:.4em}'
+		. '.answely-ask__label{display:block;font-weight:600;margin-bottom:.5em}'
 		. '.answely-ask__row{display:flex;flex-wrap:wrap;gap:.5em}'
-		. '.answely-ask__input{flex:1 1 12em;min-width:0;max-width:100%;padding:.55em .75em;font:inherit;box-sizing:border-box}'
-		. '.answely-ask__button{flex:0 0 auto;cursor:pointer}'
+		. '.answely-ask__input{flex:1 1 12em;min-width:0;max-width:100%;min-height:2.75em;padding:.6em .85em;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-color:color-mix(in srgb,currentColor 45%,transparent);border-radius:6px;box-sizing:border-box}'
+		. '.answely-ask__input::placeholder{color:inherit;opacity:.65}'
+		. '.answely-ask__input:focus-visible,.answely-ask__button:focus-visible{outline:2px solid currentColor;outline-offset:2px}'
+		. '.answely-ask__button{flex:0 0 auto;min-height:2.75em;cursor:pointer}'
 		. '.answely-ask__answer:empty{display:none}'
 		. '.answely-ask__answer{margin-top:.75em}'
+		. '@media (max-width:480px){.answely-ask__button{flex:1 1 100%}}'
 	);
 
 	wp_register_script( 'answely-block-editor', plugins_url( 'block-editor.js', __FILE__ ), array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor' ), ANSWELY_VERSION, true );
@@ -620,42 +623,22 @@ function answely_admin_assets( $hook ) {
 	if ( 'settings_page_answely' !== $hook ) {
 		return;
 	}
-	wp_register_style( 'answely-admin', false, array(), ANSWELY_VERSION );
-	wp_enqueue_style( 'answely-admin' );
-	wp_add_inline_style(
-		'answely-admin',
-		'.answely-wrap .nav-tab-wrapper{margin-bottom:16px}'
-		. '.answely-panel[hidden]{display:none}'
-		. '.answely-card{background:#fff;border:1px solid #c3c4c7;border-radius:4px;padding:4px 20px 16px;margin:0 0 20px;max-width:980px;box-sizing:border-box}'
-		. '.answely-card h2{font-size:1.2em;margin:16px 0 8px}'
-		. '.answely-steps{list-style:none;margin:8px 0;padding:0}'
-		. '.answely-steps li{display:flex;gap:8px;align-items:flex-start;margin:6px 0}'
-		. '.answely-steps .dashicons{flex:0 0 auto}'
-		. '.answely-ok{color:#008a20}.answely-warn{color:#996800}.answely-bad{color:#d63638}.answely-todo{color:#787c82}'
-		. '.answely-result{margin-top:12px;padding:10px 12px;border-left:4px solid #72aee6;background:#f6f7f7;white-space:pre-wrap;overflow-wrap:anywhere}'
-		. '.answely-result[hidden]{display:none}'
-		. '.answely-result.is-ok{border-color:#00a32a}.answely-result.is-warn{border-color:#dba617}.answely-result.is-bad{border-color:#d63638}'
-		. '.answely-result ul{margin:8px 0 0 18px;list-style:disc;white-space:normal}'
-		. '.answely-inline{display:flex;flex-wrap:wrap;gap:8px;align-items:center}'
-		. '.answely-inline input[type=text]{flex:1 1 260px;max-width:520px}'
-		. '.answely-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;background:#dba617;color:#1d2327;font-size:12px;vertical-align:middle}'
-		. '.answely-stats{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0}'
-		. '.answely-stats div{background:#f6f7f7;border-radius:4px;padding:8px 12px;min-width:120px}'
-		. '.answely-stats strong{display:block;font-size:1.4em}'
-		. '.answely-code{display:inline-block;padding:2px 6px;background:#f0f0f1;font-family:Consolas,Monaco,monospace;overflow-wrap:anywhere}'
-		. '@media (max-width:782px){.answely-card{padding:4px 12px 12px}.answely-inline .button{margin-top:4px}}'
-	);
+	wp_enqueue_style( 'answely-admin', plugins_url( 'admin.css', __FILE__ ), array( 'dashicons' ), ANSWELY_VERSION );
 
 	wp_register_script( 'answely-admin', plugins_url( 'admin.js', __FILE__ ), array(), ANSWELY_VERSION, true );
 	wp_enqueue_script( 'answely-admin' );
 	$texts = array(
-		'ajax'    => admin_url( 'admin-ajax.php' ),
-		'nonce'   => wp_create_nonce( 'answely_admin' ),
-		'hosts'   => answely_source_hosts(),
-		'working' => __( 'Working…', 'answely' ),
-		'failed'  => __( 'The request failed. Check your connection and try again.', 'answely' ),
-		'sources' => __( 'Sources', 'answely' ),
-		'copied'  => __( 'Copied', 'answely' ),
+		'ajax'       => admin_url( 'admin-ajax.php' ),
+		'nonce'      => wp_create_nonce( 'answely_admin' ),
+		'hosts'      => answely_source_hosts(),
+		'working'    => __( 'Working…', 'answely' ),
+		'failed'     => __( 'The request failed. Check your connection and try again.', 'answely' ),
+		'sources'    => __( 'Sources', 'answely' ),
+		'copied'     => __( 'Copied', 'answely' ),
+		'copyFailed' => __( 'Copying failed. The text is selected; press Ctrl+C to copy it.', 'answely' ),
+		/* translators: 1: number of characters typed, 2: maximum number of characters */
+		'count'      => __( '%1$d of %2$d characters', 'answely' ),
+		'cancel'     => __( 'Cancel', 'answely' ),
 	);
 	wp_add_inline_script( 'answely-admin', 'window.answelyAdmin = ' . wp_json_encode( $texts ) . ';', 'before' );
 }
@@ -976,7 +959,66 @@ function answely_step( $state, $text ) {
 		'bad'  => 'dismiss',
 		'todo' => 'marker',
 	);
-	echo '<li><span class="dashicons dashicons-' . esc_attr( $icons[ $state ] ) . ' answely-' . esc_attr( $state ) . '" aria-hidden="true"></span><span>' . esc_html( $text ) . '</span></li>';
+	$words = array(
+		'ok'   => __( 'Done', 'answely' ),
+		'warn' => __( 'Needs attention', 'answely' ),
+		'bad'  => __( 'Problem', 'answely' ),
+		'todo' => __( 'Open', 'answely' ),
+	);
+	echo '<li class="is-' . esc_attr( $state ) . '"><span class="dashicons dashicons-' . esc_attr( $icons[ $state ] ) . ' answely-' . esc_attr( $state ) . '" aria-hidden="true"></span><span><span class="screen-reader-text">' . esc_html( $words[ $state ] ) . ': </span>' . esc_html( $text ) . '</span></li>';
+}
+
+/**
+ * Copy button for the text of an element.
+ *
+ * @param string $target ID of the element whose text is copied.
+ */
+function answely_copy_button( $target ) {
+	echo '<button type="button" class="button button-small answely-copy" data-answely-action="copy" data-copy="' . esc_attr( $target ) . '"><span class="dashicons dashicons-admin-page" aria-hidden="true"></span><span class="answely-copy__text">' . esc_html__( 'Copy', 'answely' ) . '</span></button>';
+}
+
+/**
+ * Overall state shown next to the page title, from the saved settings and
+ * the result of the last connection check (no request).
+ *
+ * @param array $e Settings.
+ * @return array{0:string, 1:string, 2:string} Level, dashicon, text.
+ */
+function answely_header_state( array $e ) {
+	if ( '' === $e['key'] ) {
+		return array( 'todo', 'marker', __( 'Not set up', 'answely' ) );
+	}
+	$status = get_option( 'answely_status', array() );
+	$state  = is_array( $status ) && isset( $status['key'], $status['state'] ) && $status['key'] === $e['key'] ? $status['state'] : '';
+	if ( 'ok' === $state ) {
+		return array( 'ok', 'yes-alt', __( 'Connected', 'answely' ) );
+	}
+	if ( 'inactive' === $state ) {
+		return array( 'warn', 'warning', __( 'Not answering yet', 'answely' ) );
+	}
+	if ( 'unknown' === $state ) {
+		return array( 'bad', 'dismiss', __( 'Unknown site key', 'answely' ) );
+	}
+	return array( 'todo', 'marker', __( 'Connection not checked', 'answely' ) );
+}
+
+/**
+ * Progress ring: done steps of all steps, as inline SVG.
+ *
+ * @param int $done  Steps done.
+ * @param int $total All steps.
+ */
+function answely_ring( $done, $total ) {
+	$total = max( 1, (int) $total );
+	$done  = min( $total, max( 0, (int) $done ) );
+	$len   = 2 * M_PI * 22;
+	$fill  = round( $len * $done / $total, 2 );
+	/* translators: 1: number of steps done, 2: number of steps */
+	$label = sprintf( __( '%1$d of %2$d steps done', 'answely' ), $done, $total );
+	echo '<div class="answely-ring" role="img" aria-label="' . esc_attr( $label ) . '"><svg viewBox="0 0 52 52" aria-hidden="true" focusable="false">'
+		. '<circle class="answely-ring__track" cx="26" cy="26" r="22"/>'
+		. '<circle class="answely-ring__bar" cx="26" cy="26" r="22" stroke-dasharray="' . esc_attr( $fill . ' ' . round( $len, 2 ) ) . '"/>'
+		. '</svg><span class="answely-ring__text" aria-hidden="true">' . esc_html( $done . '/' . $total ) . '</span></div>';
 }
 
 /**
@@ -999,18 +1041,28 @@ function answely_seite() {
 		$tabs['customers'] = __( 'Customer orders', 'answely' );
 	}
 	$tabs['help'] = __( 'Help', 'answely' );
+	$icons        = array(
+		'connection' => 'admin-links',
+		'display'    => 'visibility',
+		'sync'       => 'update',
+		'customers'  => 'cart',
+		'help'       => 'editor-help',
+	);
+	$badge        = answely_header_state( $e );
 
-	echo '<div class="wrap answely-wrap"><h1>Answely';
+	echo '<div class="wrap answely-wrap"><div class="answely-head"><h1>Answely</h1>';
+	echo '<span class="answely-pill is-' . esc_attr( $badge[0] ) . '"><span class="dashicons dashicons-' . esc_attr( $badge[1] ) . '" aria-hidden="true"></span>' . esc_html( $badge[2] ) . '</span>';
+	echo '<span class="answely-version">' . esc_html( ANSWELY_VERSION ) . '</span>';
 	if ( 'custom' === $service['environment'] ) {
 		echo '<span class="answely-badge">' . esc_html__( 'Service address from ANSWELY_API_BASE', 'answely' ) . '</span>';
 	}
-	echo '</h1>';
+	echo '</div><hr class="wp-header-end">';
 	settings_errors( ANSWELY_OPTION );
 	answely_flash_print();
 
-	echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'Answely settings', 'answely' ) . '">';
+	echo '<nav class="nav-tab-wrapper answely-tabs" aria-label="' . esc_attr__( 'Answely settings', 'answely' ) . '">';
 	foreach ( $tabs as $id => $label ) {
-		echo '<a href="#' . esc_attr( $id ) . '" class="nav-tab" data-tab="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</a>';
+		echo '<a href="#' . esc_attr( $id ) . '" class="nav-tab" id="answely-tab-' . esc_attr( $id ) . '" data-tab="' . esc_attr( $id ) . '" aria-controls="answely-' . esc_attr( $id ) . '"><span class="dashicons dashicons-' . esc_attr( $icons[ $id ] ) . '" aria-hidden="true"></span>' . esc_html( $label ) . '</a>';
 	}
 	echo '</nav>';
 
@@ -1041,21 +1093,36 @@ function answely_tab_connection( array $e, array $service ) {
 
 	echo '<div class="answely-panel" id="answely-connection">';
 
-	echo '<div class="answely-card"><h2>' . esc_html__( 'Setup', 'answely' ) . '</h2><ol class="answely-steps">';
-	answely_step( '' !== $e['key'] ? 'ok' : 'todo', '' !== $e['key'] ? __( 'Site key saved.', 'answely' ) : __( 'Create a website in your Answely account, verify your domain and paste the site key below.', 'answely' ) );
-	$state = $status['state'] ?? '';
+	$steps = array();
+	$steps[] = array( '' !== $e['key'] ? 'ok' : 'todo', '' !== $e['key'] ? __( 'Site key saved.', 'answely' ) : __( 'Create a website in your Answely account, verify your domain and paste the site key below.', 'answely' ) );
+	$state   = $status['state'] ?? '';
 	if ( 'ok' === $state ) {
-		answely_step( 'ok', __( 'Connection checked: Answely answers for this website.', 'answely' ) );
+		$steps[] = array( 'ok', __( 'Connection checked: Answely answers for this website.', 'answely' ) );
 	} elseif ( 'inactive' === $state ) {
-		answely_step( 'warn', __( 'Site key valid, but answers are not active yet (domain verification, box switched off or quota).', 'answely' ) );
+		$steps[] = array( 'warn', __( 'Site key valid, but answers are not active yet (domain verification, box switched off or quota).', 'answely' ) );
 	} elseif ( 'unknown' === $state ) {
-		answely_step( 'bad', __( 'Answely does not know the saved site key.', 'answely' ) );
+		$steps[] = array( 'bad', __( 'Answely does not know the saved site key.', 'answely' ) );
 	} else {
-		answely_step( 'todo', __( 'Check the connection.', 'answely' ) );
+		$steps[] = array( 'todo', __( 'Check the connection.', 'answely' ) );
 	}
-	answely_step( 'ok', 'everywhere' === $e['load'] ? __( 'The answer box attaches to your search fields on every page.', 'answely' ) : __( 'The answer box loads on search results and on pages with the Answely answer field.', 'answely' ) );
-	answely_step( ! empty( $sync['an'] ) ? 'ok' : 'todo', ! empty( $sync['an'] ) ? __( 'Content sync is on.', 'answely' ) : __( 'Optional: send new and changed content to Answely right away (Content sync, Pro plan or higher).', 'answely' ) );
-	echo '</ol></div>';
+	$steps[] = array( 'ok', 'everywhere' === $e['load'] ? __( 'The answer box attaches to your search fields on every page.', 'answely' ) : __( 'The answer box loads on search results and on pages with the Answely answer field.', 'answely' ) );
+	$steps[] = array( ! empty( $sync['an'] ) ? 'ok' : 'todo', ! empty( $sync['an'] ) ? __( 'Content sync is on.', 'answely' ) : __( 'Optional: send new and changed content to Answely right away (Content sync, Pro plan or higher).', 'answely' ) );
+	$done    = count(
+		array_filter(
+			$steps,
+			static function ( $s ) {
+				return 'ok' === $s[0];
+			}
+		)
+	);
+
+	echo '<div class="answely-card answely-setup"><h2>' . esc_html__( 'Setup', 'answely' ) . '</h2><div class="answely-setup__body">';
+	answely_ring( $done, count( $steps ) );
+	echo '<ol class="answely-steps">';
+	foreach ( $steps as $s ) {
+		answely_step( $s[0], $s[1] );
+	}
+	echo '</ol></div></div>';
 
 	echo '<div class="answely-card"><h2>' . esc_html__( 'Site key', 'answely' ) . '</h2>';
 	echo '<form method="post" action="options.php">';
@@ -1073,7 +1140,7 @@ function answely_tab_connection( array $e, array $service ) {
 
 	echo '<div class="answely-card"><h2>' . esc_html__( 'Connection', 'answely' ) . '</h2>';
 	echo '<p>' . esc_html__( 'Asks Answely whether it answers for this site key. Does not use your answer quota.', 'answely' ) . '</p>';
-	echo '<p><button type="button" class="button button-secondary" data-answely-action="check" aria-controls="answely-check-out"' . disabled( '' === $e['key'], true, false ) . '>' . esc_html__( 'Check connection', 'answely' ) . '</button></p>';
+	echo '<p><button type="button" class="button button-secondary" data-answely-action="check" aria-controls="answely-check-out"' . disabled( '' === $e['key'], true, false ) . '><span class="dashicons dashicons-update" aria-hidden="true"></span>' . esc_html__( 'Check connection', 'answely' ) . '</button></p>';
 	echo '<div id="answely-check-out" class="answely-result" role="status" hidden></div>';
 	if ( ! empty( $status['time'] ) ) {
 		/* translators: %s: date and time */
@@ -1084,8 +1151,10 @@ function answely_tab_connection( array $e, array $service ) {
 	echo '<div class="answely-card"><h2>' . esc_html__( 'Test question', 'answely' ) . '</h2>';
 	echo '<p>' . esc_html__( 'Ask a question the way a visitor would. The answer comes from the pages Answely has indexed for your verified domain. A generated answer counts towards your monthly quota.', 'answely' ) . '</p>';
 	echo '<div class="answely-inline"><label class="screen-reader-text" for="answely-test-q">' . esc_html__( 'Test question', 'answely' ) . '</label>';
-	echo '<input type="text" id="answely-test-q" class="regular-text" maxlength="300" placeholder="' . esc_attr__( 'For example: How long does shipping take?', 'answely' ) . '"' . disabled( '' === $e['key'], true, false ) . '>';
-	echo '<button type="button" class="button button-secondary" data-answely-action="test" aria-controls="answely-test-out"' . disabled( '' === $e['key'], true, false ) . '>' . esc_html__( 'Ask', 'answely' ) . '</button></div>';
+	echo '<input type="text" id="answely-test-q" class="regular-text" maxlength="300" aria-describedby="answely-test-count" placeholder="' . esc_attr__( 'For example: How long does shipping take?', 'answely' ) . '"' . disabled( '' === $e['key'], true, false ) . '>';
+	echo '<button type="button" class="button button-secondary" data-answely-action="test" aria-controls="answely-test-out"' . disabled( '' === $e['key'], true, false ) . '><span class="dashicons dashicons-format-chat" aria-hidden="true"></span>' . esc_html__( 'Ask', 'answely' ) . '</button></div>';
+	/* translators: 1: number of characters typed, 2: maximum number of characters */
+	echo '<p class="answely-count" id="answely-test-count">' . esc_html( sprintf( __( '%1$d of %2$d characters', 'answely' ), 0, 300 ) ) . '</p>';
 	echo '<div id="answely-test-out" class="answely-result" role="status" aria-live="polite" hidden></div>';
 	echo '</div>';
 
@@ -1137,7 +1206,7 @@ function answely_tab_display( array $e ) {
 	echo '<tr><th scope="row">' . esc_html__( 'Wait for consent', 'answely' ) . '</th><td><label><input type="checkbox" name="answely[zustimmung]" value="1"' . checked( $e['zustimmung'], true, false ) . '> ';
 	echo esc_html__( 'Fetch no configuration and no answer from Answely until the visitor has agreed', 'answely' ) . '</label>';
 	echo '<p class="description">' . esc_html__( 'The script file is still loaded from cdn.answely.com: the browser of the visitor requests it like any file from another host, which transmits the IP address and the user agent. Before consent the script fetches neither its configuration nor any answer from api.answely.com. IAB TCF v2 (purpose 1) and consented.eu are detected automatically.', 'answely' ) . '</p></td></tr>';
-	echo '<tr><th scope="row">' . esc_html__( 'WP Consent API', 'answely' ) . '</th><td><label><input type="checkbox" name="answely[wp_consent]" value="1"' . checked( $e['wp_consent'], true, false ) . '> ';
+	echo '<tr><th scope="row">' . esc_html__( 'WP Consent API', 'answely' ) . '</th><td><label><input type="checkbox" id="answely-wp-consent" name="answely[wp_consent]" value="1" aria-controls="answely-category"' . checked( $e['wp_consent'], true, false ) . '> ';
 	echo esc_html__( 'Take consent from the WP Consent API', 'answely' ) . '</label> ';
 	echo '<label for="answely-category" class="screen-reader-text">' . esc_html__( 'Consent category', 'answely' ) . '</label><select id="answely-category" name="answely[consent_category]">';
 	foreach ( answely_consent_categories() as $code => $label ) {
@@ -1147,7 +1216,11 @@ function answely_tab_display( array $e ) {
 	echo esc_html( $wpc ? __( 'The WP Consent API is active on this site. Consent tools such as Complianz, CookieYes or Cookiebot pass their decision through it.', 'answely' ) : __( 'The WP Consent API plugin is not active on this site; this setting takes effect once it is.', 'answely' ) );
 	echo '</p></td></tr>';
 	echo '<tr><th scope="row">' . esc_html__( 'Other consent tools', 'answely' ) . '</th><td><p>' . esc_html__( 'Call this from your consent tool when the visitor agrees or withdraws:', 'answely' ) . '</p>';
-	echo '<p><code class="answely-code">Answely(\'zustimmung\', true);</code> <code class="answely-code">Answely(\'zustimmung\', false);</code></p>';
+	echo '<p class="answely-snippets"><span class="answely-snippet"><code class="answely-code" id="answely-consent-yes">Answely(\'zustimmung\', true);</code>';
+	answely_copy_button( 'answely-consent-yes' );
+	echo '</span> <span class="answely-snippet"><code class="answely-code" id="answely-consent-no">Answely(\'zustimmung\', false);</code>';
+	answely_copy_button( 'answely-consent-no' );
+	echo '</span></p>';
 	echo '<p class="description">' . esc_html__( 'Developers can add such a bridge with the answely_inline_script filter.', 'answely' ) . '</p></td></tr>';
 	echo '</table></div>';
 
@@ -1156,8 +1229,9 @@ function answely_tab_display( array $e ) {
 
 	echo '<div class="answely-card"><h2>' . esc_html__( 'Answer field (block and shortcode)', 'answely' ) . '</h2>';
 	echo '<p>' . esc_html__( 'Add a question field that shows the answer right below it, for example on a help or FAQ page: in the block editor, insert the block "Answely answer field", or use the shortcode:', 'answely' ) . '</p>';
-	echo '<p><code class="answely-code" id="answely-shortcode">[answely label="Ask about our products" placeholder="Your question" button="Ask"]</code> ';
-	echo '<button type="button" class="button button-small" data-answely-action="copy" data-copy="answely-shortcode">' . esc_html__( 'Copy', 'answely' ) . '</button></p>';
+	echo '<p class="answely-snippet"><code class="answely-code" id="answely-shortcode">[answely label="Ask about our products" placeholder="Your question" button="Ask"]</code> ';
+	answely_copy_button( 'answely-shortcode' );
+	echo '</p>';
 	echo '<p class="description">' . esc_html__( 'All attributes are optional. Without JavaScript, without consent or without a site key the field opens the normal search results page.', 'answely' ) . '</p>';
 	echo '</div>';
 
@@ -1172,11 +1246,16 @@ function answely_tab_display( array $e ) {
 function answely_tab_help( array $service ) {
 	echo '<div class="answely-panel" id="answely-help"><div class="answely-card">';
 	echo '<h2>' . esc_html__( 'How Answely works on your site', 'answely' ) . '</h2>';
-	echo '<ol>';
-	echo '<li>' . esc_html__( 'Answely reads the public pages of your verified domain (crawling, or the content sync of this plugin) and builds a search index.', 'answely' ) . '</li>';
-	echo '<li>' . esc_html__( 'On every page where it loads, the box fetches its configuration (site key and language) from Answely; with "Wait for consent" only after the visitor agrees.', 'answely' ) . '</li>';
-	echo '<li>' . esc_html__( 'When a visitor searches, the box sends the question, the language, the site key, the page address and the referring page address (both without parameters) to Answely, for follow-up questions optionally also earlier questions and answers of the same box. Answely answers only from sections of your site that back the answer and lists them as sources. Every answer is labelled as AI-generated.', 'answely' ) . '</li>';
-	echo '<li>' . esc_html__( 'Your search keeps working at all times; if Answely is unavailable, the box simply does not appear.', 'answely' ) . '</li>';
+	$flow = array(
+		array( 'admin-site-alt3', __( 'Index', 'answely' ), __( 'Answely reads the public pages of your verified domain (crawling, or the content sync of this plugin) and builds a search index.', 'answely' ) ),
+		array( 'shield', __( 'Configuration', 'answely' ), __( 'On every page where it loads, the box fetches its configuration (site key and language) from Answely; with "Wait for consent" only after the visitor agrees.', 'answely' ) ),
+		array( 'format-chat', __( 'Question and answer', 'answely' ), __( 'When a visitor searches, the box sends the question, the language, the site key, the page address and the referring page address (both without parameters) to Answely, for follow-up questions optionally also earlier questions and answers of the same box. Answely answers only from sections of your site that back the answer and lists them as sources. Every answer is labelled as AI-generated.', 'answely' ) ),
+		array( 'search', __( 'Fallback', 'answely' ), __( 'Your search keeps working at all times; if Answely is unavailable, the box simply does not appear.', 'answely' ) ),
+	);
+	echo '<ol class="answely-flow">';
+	foreach ( $flow as $step ) {
+		echo '<li><span class="answely-flow__icon dashicons dashicons-' . esc_attr( $step[0] ) . '" aria-hidden="true"></span><strong class="answely-flow__title">' . esc_html( $step[1] ) . '</strong><span class="answely-flow__text">' . esc_html( $step[2] ) . '</span></li>';
+	}
 	echo '</ol>';
 	echo '<h2>' . esc_html__( 'Troubleshooting', 'answely' ) . '</h2><ul class="ul-disc">';
 	echo '<li>' . esc_html__( 'No box appears: check the connection on the first tab; the domain must be verified in your account and the first index must be ready (this can take a while for large sites).', 'answely' ) . '</li>';

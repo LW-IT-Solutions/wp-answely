@@ -100,7 +100,7 @@ function answely_customer_seite() {
 			echo esc_html( answely_customer_t( 'ss_pair_success' ) );
 		}
 		echo '</p></div>';
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="answely_customer_disconnect">';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" data-answely-confirm="' . esc_attr__( 'Disconnect customer orders? Signed-in customers no longer see "My orders" next to the answer box until this site is connected again.', 'answely' ) . '" data-answely-confirm-button="' . esc_attr( answely_customer_t( 'ss_plugin_disconnect' ) ) . '"><input type="hidden" name="action" value="answely_customer_disconnect">';
 		wp_nonce_field( 'answely_customer_disconnect' );
 		submit_button( answely_customer_t( 'ss_plugin_disconnect' ), 'secondary' );
 		echo '</form></div>';

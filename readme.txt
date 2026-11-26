@@ -4,7 +4,7 @@ Tags: search, ai, answers, site search, faq
 Requires at least: 6.3
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -94,6 +94,14 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 
 == Changelog ==
 
+= 1.4.0 =
+* Settings page: status badge next to the title, a progress ring for the setup steps and icons on the tabs, which now work as an accessible tab list (arrow keys, Home, End).
+* Content sync: tiles and a share bar for accepted, pending and rejected documents, a status badge, and rejected content as a table with edit links.
+* Checks and test questions show a loading indicator and a coloured result with an icon; the test question shows a character counter.
+* Copy buttons for the shortcode and the consent calls, with feedback and a fallback that selects the text.
+* Resetting the sync state and disconnecting customer orders ask for confirmation in a dialog of the admin.
+* The Help tab shows how Answely works as four steps; the answer field has clearer focus rings, larger touch targets and works on light and dark themes.
+
 = 1.3.1 =
 * Readme and settings texts describe exactly what is sent and when, including the configuration request of the script and what "Wait for consent" does.
 * Customer orders are shown without asking Answely first; Answely is only told once that the panel works and when it is disconnected.
@@ -120,6 +128,9 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 * First version: site key, consent mode, script tag in the page head.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+Clearer settings page with status, progress and accessible tabs. No change to what is sent. Existing settings are kept.
 
 = 1.3.1 =
 Clearer privacy texts, customer orders without a status request to Answely, readable JavaScript files. Requires WordPress 6.3.

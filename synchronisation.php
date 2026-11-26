@@ -838,15 +838,42 @@ function answely_sync_seite() {
 	$sent    = count( $s['gesendet'] ?? array() );
 	$failed  = isset( $s['failed'] ) && is_array( $s['failed'] ) ? $s['failed'] : array();
 
-	echo '<div class="answely-card"><h2>' . esc_html__( 'Content sync', 'answely' ) . '</h2>';
+	if ( empty( $s['an'] ) ) {
+		$pill = array( 'todo', 'controls-pause', __( 'Off', 'answely' ) );
+	} elseif ( ! $token || ! $e['key'] ) {
+		$pill = array( 'warn', 'warning', __( 'Waiting for push token', 'answely' ) );
+	} elseif ( ! empty( $s['fehler'] ) ) {
+		$pill = array( 'bad', 'dismiss', __( 'Delivery problem', 'answely' ) );
+	} else {
+		$pill = array( 'ok', 'yes-alt', __( 'On', 'answely' ) );
+	}
+	echo '<div class="answely-card"><h2 class="answely-card__title">' . esc_html__( 'Content sync', 'answely' );
+	echo '<span class="answely-pill is-' . esc_attr( $pill[0] ) . '"><span class="dashicons dashicons-' . esc_attr( $pill[1] ) . '" aria-hidden="true"></span>' . esc_html( $pill[2] ) . '</span></h2>';
 	echo '<p>' . esc_html__( 'Answely indexes your public pages by itself. With content sync, this site also sends new, changed and removed content right away through the Answely Push API, including content the crawler cannot read. Requires the Pro plan or higher and a verified domain.', 'answely' ) . '</p>';
 	echo '<p>' . esc_html__( 'Only published, public content of the selected types is sent: no drafts, no private or password-protected content, nothing marked as noindex (Yoast SEO, Rank Math, SEOPress), nothing excluded on the page itself. Shortcodes are removed, not executed.', 'answely' ) . '</p>';
 
+	$parts = array(
+		array( 'ok', 'yes-alt', $sent, __( 'accepted documents', 'answely' ) ),
+		array( 'pending', 'clock', $pending, __( 'pending', 'answely' ) ),
+		array( 'bad', 'dismiss', count( $failed ), __( 'rejected', 'answely' ) ),
+	);
 	echo '<div class="answely-stats">';
-	echo '<div><strong>' . esc_html( (string) $sent ) . '</strong>' . esc_html__( 'accepted documents', 'answely' ) . '</div>';
-	echo '<div><strong>' . esc_html( (string) $pending ) . '</strong>' . esc_html__( 'pending', 'answely' ) . '</div>';
-	echo '<div><strong>' . esc_html( (string) count( $failed ) ) . '</strong>' . esc_html__( 'rejected', 'answely' ) . '</div>';
+	foreach ( $parts as $part ) {
+		echo '<div class="answely-stat is-' . esc_attr( $part[0] ) . '"><span class="dashicons dashicons-' . esc_attr( $part[1] ) . '" aria-hidden="true"></span><strong>' . esc_html( number_format_i18n( $part[2] ) ) . '</strong>' . esc_html( $part[3] ) . '</div>';
+	}
 	echo '</div>';
+	$all = $sent + $pending + count( $failed );
+	if ( $all > 0 ) {
+		/* translators: 1: accepted, 2: pending, 3: rejected */
+		$label = sprintf( __( 'Share of documents: %1$d accepted, %2$d pending, %3$d rejected', 'answely' ), $sent, $pending, count( $failed ) );
+		echo '<div class="answely-bar" role="img" aria-label="' . esc_attr( $label ) . '">';
+		foreach ( $parts as $part ) {
+			if ( $part[2] > 0 ) {
+				echo '<span class="answely-bar__part is-' . esc_attr( $part[0] ) . '" style="' . esc_attr( 'flex-grow:' . (int) $part[2] ) . '"></span>';
+			}
+		}
+		echo '</div>';
+	}
 	if ( ! empty( $s['letzte_annahme'] ) ) {
 		/* translators: %s: date and time */
 		echo '<p class="description">' . esc_html( sprintf( __( 'Last delivery: %s', 'answely' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $s['letzte_annahme'] ) ) ) . '</p>';
@@ -855,16 +882,19 @@ function answely_sync_seite() {
 		echo '<div class="notice notice-error inline"><p>' . esc_html( answely_sync_fehler_text( $s['fehler'] ) ) . '</p></div>';
 	}
 	if ( $failed ) {
-		echo '<details><summary>' . esc_html__( 'Rejected content', 'answely' ) . '</summary><ul class="ul-disc">';
+		echo '<details class="answely-rejected"><summary>' . esc_html__( 'Rejected content', 'answely' ) . '</summary>';
+		echo '<table class="widefat striped answely-table"><thead><tr><th scope="col">' . esc_html__( 'Content', 'answely' ) . '</th><th scope="col">' . esc_html__( 'Reason', 'answely' ) . '</th></tr></thead><tbody>';
 		foreach ( array_slice( $failed, 0, 20, true ) as $id => $code ) {
 			$title = get_the_title( (int) $id );
-			echo '<li>' . esc_html( '' !== $title ? $title : '#' . (int) $id ) . ': ' . esc_html( answely_sync_fehler_text( (string) $code ) ) . '</li>';
+			$title = '' !== $title ? $title : '#' . (int) $id;
+			$edit  = get_edit_post_link( (int) $id );
+			echo '<tr><td>' . ( $edit ? '<a href="' . esc_url( $edit ) . '">' . esc_html( $title ) . '</a>' : esc_html( $title ) ) . '</td><td>' . esc_html( answely_sync_fehler_text( (string) $code ) ) . '</td></tr>';
 		}
-		echo '</ul></details>';
+		echo '</tbody></table></details>';
 	}
 	echo '<p class="answely-inline">';
-	echo '<button type="button" class="button" data-answely-action="sync_now" aria-controls="answely-sync-out"' . disabled( ! $token || ! $e['key'], true, false ) . '>' . esc_html__( 'Process queue now', 'answely' ) . '</button>';
-	echo '<button type="button" class="button" data-answely-action="index" aria-controls="answely-sync-out"' . disabled( ! $token || ! $e['key'], true, false ) . '>' . esc_html__( 'Check index status', 'answely' ) . '</button>';
+	echo '<button type="button" class="button" data-answely-action="sync_now" aria-controls="answely-sync-out"' . disabled( ! $token || ! $e['key'], true, false ) . '><span class="dashicons dashicons-controls-play" aria-hidden="true"></span>' . esc_html__( 'Process queue now', 'answely' ) . '</button>';
+	echo '<button type="button" class="button" data-answely-action="index" aria-controls="answely-sync-out"' . disabled( ! $token || ! $e['key'], true, false ) . '><span class="dashicons dashicons-search" aria-hidden="true"></span>' . esc_html__( 'Check index status', 'answely' ) . '</button>';
 	echo '</p><div id="answely-sync-out" class="answely-result" role="status" hidden></div>';
 	echo '<p class="description">' . esc_html__( '"Accepted" means Answely took the document; indexing usually follows within seconds. WP-Cron must run on this site for automatic delivery.', 'answely' ) . '</p>';
 	echo '</div>';
@@ -904,7 +934,7 @@ function answely_sync_seite() {
 	echo '<div class="answely-card"><h2>' . esc_html__( 'Before removing the plugin', 'answely' ) . '</h2>';
 	echo '<p>' . esc_html__( 'Switch content sync off and wait until "pending" is 0, so that the documents sent by this site are removed from Answely. Deleting the plugin removes its settings from WordPress but does not contact Answely.', 'answely' ) . '</p>';
 	if ( ! empty( $s['bindung'] ) || $sent ) {
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="answely_sync_reset">';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" data-answely-confirm="' . esc_attr__( 'Reset the synchronization state? This site forgets which documents it has sent; they stay at the previous Answely website and are not removed there.', 'answely' ) . '" data-answely-confirm-button="' . esc_attr__( 'Reset state', 'answely' ) . '"><input type="hidden" name="action" value="answely_sync_reset">';
 		wp_nonce_field( 'answely_sync_reset' );
 		submit_button( __( 'Reset synchronization state', 'answely' ), 'secondary', 'submit', false );
 		echo '<p class="description">' . esc_html__( 'Only needed after changing the site key. Forgets which documents were sent; they are not removed from the previous Answely website.', 'answely' ) . '</p></form>';
