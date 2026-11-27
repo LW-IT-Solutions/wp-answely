@@ -913,7 +913,9 @@ function answely_sync_seite() {
 
 	echo '<tr><th scope="row"><label for="answely-exclude">' . esc_html__( 'Excluded paths', 'answely' ) . '</label></th><td>';
 	echo '<textarea id="answely-exclude" name="pfade" rows="4" class="large-text code" placeholder="/members/&#10;/shop/wholesale/">' . esc_textarea( implode( "\n", isset( $s['pfade'] ) && is_array( $s['pfade'] ) ? $s['pfade'] : array() ) ) . '</textarea>';
-	echo '<p class="description">' . esc_html__( 'One path per line. Content whose address starts with one of these paths is not sent. Single pages can be excluded in the editor (box "Answely").', 'answely' ) . '</p></td></tr>';
+	echo '<p class="description">' . esc_html__( 'One path per line. Content whose address starts with one of these paths is not sent. Single pages can be excluded in the editor (box "Answely").', 'answely' ) . '</p>';
+	answely_sync_path_test( $types );
+	echo '</td></tr>';
 
 	echo '<tr><th scope="row"><label for="answely-token">' . esc_html__( 'Push token', 'answely' ) . '</label></th><td>';
 	if ( answely_sync_token_constant() ) {
@@ -940,6 +942,45 @@ function answely_sync_seite() {
 		echo '<p class="description">' . esc_html__( 'Only needed after changing the site key. Forgets which documents were sent; they are not removed from the previous Answely website.', 'answely' ) . '</p></form>';
 	}
 	echo '</div>';
+}
+
+/**
+ * Live test of the excluded paths against published content of the selected types (admin.js; no request).
+ * Up to 300 recently changed entries; the addresses are only placed in this admin page.
+ *
+ * @param string[] $types Selected post types.
+ */
+function answely_sync_path_test( array $types ) {
+	$types = array_values( array_intersect( $types, array_keys( answely_sync_available_types() ) ) );
+	if ( ! $types ) {
+		return;
+	}
+	$ids  = get_posts(
+		array(
+			'post_type'        => $types,
+			'post_status'      => 'publish',
+			'has_password'     => false,
+			'numberposts'      => 300,
+			'orderby'          => 'modified',
+			'order'            => 'DESC',
+			'fields'           => 'ids',
+			'suppress_filters' => false,
+		)
+	);
+	$list = array();
+	foreach ( $ids as $id ) {
+		$path = (string) wp_parse_url( (string) get_permalink( $id ), PHP_URL_PATH );
+		if ( '' !== $path ) {
+			$list[] = array( $path, html_entity_decode( get_the_title( $id ), ENT_QUOTES, 'UTF-8' ) );
+		}
+	}
+	if ( ! $list ) {
+		return;
+	}
+	global $wp_rewrite;
+	$plain = ! ( $wp_rewrite instanceof WP_Rewrite && $wp_rewrite->using_permalinks() );
+	echo '<div class="answely-pathtest" data-answely-paths="' . esc_attr( wp_json_encode( $list ) ) . '"' . ( $plain ? ' data-answely-plain="' . esc_attr__( 'This site uses plain permalinks (?p=123): every address has the path "/", so excluded paths do not match any entry. Exclude single pages in the editor instead.', 'answely' ) . '"' : '' ) . ' hidden>';
+	echo '<p class="answely-pathtest__sum" aria-live="polite"></p><ul class="answely-pathtest__list"></ul></div>';
 }
 
 /**

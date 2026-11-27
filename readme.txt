@@ -4,7 +4,7 @@ Tags: search, ai, answers, site search, faq
 Requires at least: 6.3
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -94,6 +94,15 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 
 == Changelog ==
 
+= 1.5.0 =
+* Setup: open steps link straight to the field, button or tab where they are done; the progress ring draws in once.
+* Test question: the answer shows time, number of sources and words, appears word by word and lists its sources as cards with their path. Questions asked on the page can be put back in the field with one click (nothing is stored).
+* Display & privacy: new live sketch "What happens on a visitor's page" that follows the load and consent settings before saving.
+* Answer field: a small builder writes the shortcode while typing and previews the field in a light and a dark theme.
+* Content sync: excluded paths are tested while typing against the most recently changed published entries, with the matching part highlighted; sites with plain permalinks get a note.
+* Wider push token field and more space next to the arrow of select fields.
+* No change to what is sent or stored; animations are skipped with reduced motion.
+
 = 1.4.0 =
 * Settings page: status badge next to the title, a progress ring for the setup steps and icons on the tabs, which now work as an accessible tab list (arrow keys, Home, End).
 * Content sync: tiles and a share bar for accepted, pending and rejected documents, a status badge, and rejected content as a table with edit links.
@@ -128,6 +137,9 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 * First version: site key, consent mode, script tag in the page head.
 
 == Upgrade Notice ==
+
+= 1.5.0 =
+Visual help on the settings page: jump links, answer details, live preview, shortcode builder and a path test. No change to what is sent. Existing settings are kept.
 
 = 1.4.0 =
 Clearer settings page with status, progress and accessible tabs. No change to what is sent. Existing settings are kept.

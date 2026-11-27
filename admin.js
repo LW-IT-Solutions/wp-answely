@@ -193,17 +193,57 @@
 		}
 	}
 
-	function showAnswer( out, r ) {
+	var calm = !! ( w.matchMedia && w.matchMedia( '(prefers-reduced-motion: reduce)' ).matches );
+
+	// Shows the answer word by word once (about one second in all); with reduced motion at once.
+	function reveal( p, text ) {
+		var words = text.split( /(\s+)/ );
+		if ( calm || words.length < 4 ) {
+			p.textContent = text;
+			return;
+		}
+		p.textContent = '';
+		p.classList.add( 'is-typing' );
+		var i = 0;
+		var per = Math.max( 1, Math.ceil( words.length / 40 ) );
+		var tick = function () {
+			p.textContent += words.slice( i, i + per ).join( '' );
+			i += per;
+			if ( i < words.length ) {
+				w.setTimeout( tick, 25 );
+			} else {
+				p.classList.remove( 'is-typing' );
+			}
+		};
+		tick();
+	}
+
+	function showAnswer( out, r, secs ) {
 		if ( ! r.answer ) {
 			showResult( out, r );
 			return;
 		}
 		box( out, r.level === 'ok' ? 'is-ok' : 'is-warn', '' );
 
+		var answer = String( r.answer );
+		var nSources = Array.isArray( r.sources ) ? r.sources.length : 0;
+		if ( typeof secs === 'number' && c.meta ) {
+			var m = d.createElement( 'p' );
+			m.className = 'answely-result__meta';
+			m.textContent = c.meta.replace( '%1$s', secs.toLocaleString( d.documentElement.lang || undefined, { minimumFractionDigits: secs < 1 ? 2 : 1, maximumFractionDigits: secs < 1 ? 2 : 1 } ) ).replace( '%2$d', nSources ).replace( '%3$d', answer.split( /\s+/ ).filter( Boolean ).length );
+			out.appendChild( m );
+		}
+
 		var p = d.createElement( 'p' );
 		p.className = 'answely-result__text';
-		p.textContent = String( r.answer );
+		// The full text is read once by screen readers; the visible text is revealed.
+		var sr = d.createElement( 'span' );
+		sr.className = 'screen-reader-text';
+		sr.textContent = answer;
+		out.appendChild( sr );
+		p.setAttribute( 'aria-hidden', 'true' );
 		out.appendChild( p );
+		reveal( p, answer );
 
 		if ( Array.isArray( r.sources ) && r.sources.length ) {
 			var h = d.createElement( 'strong' );
@@ -219,7 +259,19 @@
 					l.href = u;
 					l.target = '_blank';
 					l.rel = 'noopener noreferrer';
-					l.textContent = String( s.title || u );
+					l.className = 'answely-src';
+					var ic = d.createElement( 'span' );
+					ic.className = 'dashicons dashicons-media-document';
+					ic.setAttribute( 'aria-hidden', 'true' );
+					var tt = d.createElement( 'span' );
+					tt.className = 'answely-src__title';
+					tt.textContent = String( s.title || u );
+					var pa = d.createElement( 'span' );
+					pa.className = 'answely-src__path';
+					pa.textContent = new URL( u ).pathname;
+					l.appendChild( ic );
+					l.appendChild( tt );
+					l.appendChild( pa );
 					li.appendChild( l );
 				} else {
 					li.textContent = String( s.title || '' );
@@ -324,11 +376,47 @@
 				}
 				return;
 			}
+			var t0 = w.performance ? w.performance.now() : Date.now();
 			post( 'answely_test', { q: v }, out, b, function ( r ) {
-				showAnswer( out, r );
+				showAnswer( out, r, ( ( w.performance ? w.performance.now() : Date.now() ) - t0 ) / 1000 );
+				remember( v );
 			} );
 		}
 	} );
+
+	/*
+	 * Questions asked on this page, as chips that put the question back in the field (memory only;
+	 * asking again is a separate click because every answer counts towards the quota).
+	 */
+	var asked = [];
+	function remember( q ) {
+		var wrap = d.getElementById( 'answely-recent' );
+		var field = d.getElementById( 'answely-test-q' );
+		if ( ! wrap || ! field ) {
+			return;
+		}
+		asked = [ q ].concat( asked.filter( function ( x ) {
+			return x !== q;
+		} ) ).slice( 0, 5 );
+		[].slice.call( wrap.querySelectorAll( '.answely-chip' ) ).forEach( function ( n ) {
+			n.remove();
+		} );
+		asked.forEach( function ( x ) {
+			var chip = d.createElement( 'button' );
+			chip.type = 'button';
+			chip.className = 'answely-chip';
+			chip.textContent = x.length > 48 ? x.slice( 0, 47 ) + '\u2026' : x;
+			chip.title = c.reuse;
+			chip.setAttribute( 'aria-label', c.reuse + ': ' + x );
+			chip.addEventListener( 'click', function () {
+				field.value = x;
+				field.dispatchEvent( new Event( 'input' ) );
+				field.focus();
+			} );
+			wrap.appendChild( chip );
+		} );
+		wrap.hidden = false;
+	}
 
 	// Enter in the test question field asks the question; the counter follows the input.
 	var tq = d.getElementById( 'answely-test-q' );
@@ -370,6 +458,210 @@
 				cat.disabled = false;
 			} );
 		}
+	}
+
+	/*
+	 * Setup: links of open steps switch to the right tab and focus the field or button.
+	 */
+	d.addEventListener( 'click', function ( e ) {
+		var a = e.target.closest ? e.target.closest( '.answely-step__go' ) : null;
+		if ( ! a ) {
+			return;
+		}
+		var id = ( a.getAttribute( 'href' ) || '' ).slice( 1 );
+		var target = d.getElementById( id );
+		if ( ! target && d.getElementById( 'answely-' + id ) ) {
+			e.preventDefault();
+			show( id, true );
+			var panel = d.getElementById( 'answely-' + id );
+			var tab = d.getElementById( 'answely-tab-' + id );
+			if ( tab ) {
+				tab.focus();
+			}
+			panel.scrollIntoView( { behavior: calm ? 'auto' : 'smooth', block: 'start' } );
+			return;
+		}
+		if ( target ) {
+			e.preventDefault();
+			var home = target.closest( '.answely-panel' );
+			if ( home && home.hidden ) {
+				show( home.id.replace( /^answely-/, '' ), true );
+			}
+			target.scrollIntoView( { behavior: calm ? 'auto' : 'smooth', block: 'center' } );
+			target.focus( { preventScroll: true } );
+			target.classList.add( 'answely-flash' );
+			w.setTimeout( function () {
+				target.classList.remove( 'answely-flash' );
+			}, 1600 );
+		}
+	} );
+
+	// Setup ring: draws in and counts up once.
+	var ring = d.querySelector( '.answely-ring[data-answely-done]' );
+	if ( ring && ! calm ) {
+		var done = parseInt( ring.getAttribute( 'data-answely-done' ), 10 ) || 0;
+		var all = parseInt( ring.getAttribute( 'data-answely-total' ), 10 ) || 1;
+		var label = ring.querySelector( '.answely-ring__text' );
+		ring.classList.add( 'is-animated' );
+		if ( label && done > 0 ) {
+			var k = 0;
+			var up = function () {
+				label.textContent = k + '/' + all;
+				if ( k < done ) {
+					k++;
+					w.setTimeout( up, 650 / done );
+				}
+			};
+			up();
+		}
+	}
+
+	/*
+	 * Display tab: the sketch of a visitor's page follows the form before it is saved.
+	 */
+	var preview = d.querySelector( '[data-answely-preview]' );
+	if ( preview ) {
+		var form = preview.closest( 'form' );
+		var follow = function () {
+			var load = form.querySelector( 'input[name="answely[load]"]:checked' );
+			var everywhere = ! load || load.value === 'everywhere';
+			var wait = form.querySelector( 'input[name="answely[zustimmung]"]' );
+			var api = form.querySelector( '#answely-wp-consent' );
+			var cat = form.querySelector( '#answely-category' );
+			[].slice.call( preview.querySelectorAll( '[data-answely-page]' ) ).forEach( function ( li ) {
+				var on = everywhere || li.getAttribute( 'data-answely-page' ) === 'search';
+				var st = li.querySelector( '.answely-pages__state' );
+				li.classList.toggle( 'is-on', on );
+				li.classList.toggle( 'is-off', ! on );
+				if ( st ) {
+					st.textContent = st.getAttribute( on ? 'data-on' : 'data-off' );
+				}
+			} );
+			var step = preview.querySelector( '[data-answely-step="consent"]' );
+			if ( step && wait ) {
+				step.hidden = ! wait.checked;
+				var txt = step.querySelector( '[data-answely-cat-template]' );
+				if ( txt ) {
+					txt.textContent = api && api.checked && cat
+						? txt.getAttribute( 'data-answely-cat-template' ).replace( '%s', cat.options[ cat.selectedIndex ].text )
+						: txt.getAttribute( 'data-answely-cat-off' );
+				}
+			}
+			preview.classList.remove( 'is-pulse' );
+			if ( ! calm ) {
+				w.requestAnimationFrame( function () {
+					preview.classList.add( 'is-pulse' );
+				} );
+			}
+		};
+		form.addEventListener( 'change', follow );
+	}
+
+	/*
+	 * Shortcode builder: the example shortcode, its copy button and the previews follow the fields.
+	 */
+	var builder = d.querySelector( '[data-answely-builder]' );
+	var code = d.getElementById( 'answely-shortcode' );
+	if ( builder && code ) {
+		builder.hidden = false;
+		var inputs = [].slice.call( builder.querySelectorAll( '[data-answely-attr]' ) );
+		var build = function () {
+			var parts = [ '[answely' ];
+			inputs.forEach( function ( i ) {
+				var v = i.value.replace( /["\[\]]/g, '' ).replace( /\s+/g, ' ' ).trim();
+				var name = i.getAttribute( 'data-answely-attr' );
+				if ( v ) {
+					parts.push( name + '="' + v + '"' );
+				}
+				[].slice.call( builder.querySelectorAll( '[data-answely-show="' + name + '"]' ) ).forEach( function ( n ) {
+					n.textContent = v || i.getAttribute( 'value' ) || '';
+					n.classList.toggle( 'is-default', ! v );
+				} );
+			} );
+			code.textContent = parts.join( ' ' ) + ']';
+		};
+		inputs.forEach( function ( i ) {
+			i.addEventListener( 'input', build );
+		} );
+		build();
+	}
+
+	/*
+	 * Content sync: test the excluded paths against recently changed published entries while typing.
+	 */
+	var pt = d.querySelector( '[data-answely-paths]' );
+	var area = d.getElementById( 'answely-exclude' );
+	if ( pt && area ) {
+		var entries = [];
+		try {
+			entries = JSON.parse( pt.getAttribute( 'data-answely-paths' ) ) || [];
+		} catch ( x ) {}
+		var sum = pt.querySelector( '.answely-pathtest__sum' );
+		var ul = pt.querySelector( '.answely-pathtest__list' );
+		var prefixes = function () {
+			return area.value.split( /\r?\n/ ).map( function ( line ) {
+				line = line.trim();
+				if ( ! line ) {
+					return '';
+				}
+				if ( /^[a-z][a-z0-9+.-]*:\/\//i.test( line ) ) {
+					try {
+						line = new URL( line ).pathname;
+					} catch ( x ) {
+						return '';
+					}
+				}
+				line = '/' + line.split( /[?#]/ )[ 0 ].replace( /^\/+/, '' );
+				return line === '/' ? '' : line;
+			} ).filter( Boolean );
+		};
+		var test = function () {
+			var list = prefixes();
+			ul.textContent = '';
+			pt.hidden = ! list.length;
+			if ( ! list.length ) {
+				return;
+			}
+			var hits = entries.filter( function ( en ) {
+				return list.some( function ( pre ) {
+					return en[ 0 ].indexOf( pre ) === 0;
+				} );
+			} );
+			pt.classList.toggle( 'has-hits', hits.length > 0 );
+			if ( pt.hasAttribute( 'data-answely-plain' ) ) {
+				sum.textContent = pt.getAttribute( 'data-answely-plain' );
+				return;
+			}
+			sum.textContent = hits.length
+				? c.pathSum.replace( '%1$d', hits.length ).replace( '%2$d', entries.length )
+				: c.pathNone;
+			hits.slice( 0, 8 ).forEach( function ( en ) {
+				var pre = list.filter( function ( x ) {
+					return en[ 0 ].indexOf( x ) === 0;
+				} ).sort( function ( a, b ) {
+					return b.length - a.length;
+				} )[ 0 ];
+				var li = d.createElement( 'li' );
+				var codeEl = d.createElement( 'code' );
+				var mark = d.createElement( 'mark' );
+				mark.textContent = pre;
+				codeEl.appendChild( mark );
+				codeEl.appendChild( d.createTextNode( en[ 0 ].slice( pre.length ) ) );
+				var t = d.createElement( 'span' );
+				t.textContent = en[ 1 ];
+				li.appendChild( codeEl );
+				li.appendChild( t );
+				ul.appendChild( li );
+			} );
+			if ( hits.length > 8 ) {
+				var more = d.createElement( 'li' );
+				more.className = 'answely-pathtest__more';
+				more.textContent = c.pathMore.replace( '%d', hits.length - 8 );
+				ul.appendChild( more );
+			}
+		};
+		area.addEventListener( 'input', test );
+		test();
 	}
 
 	/*
