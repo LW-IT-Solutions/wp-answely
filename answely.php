@@ -3,7 +3,7 @@
  * Plugin Name:       Answely – AI Answers for Site Search
  * Plugin URI:        https://answely.com/
  * Description:       Short AI answers with sources above your site search results. Adds the Answely script with your site key, an answer field block and shortcode, consent handling and an optional synchronization of public content.
- * Version:           1.5.0
+ * Version:           1.5.1
  * Requires at least: 6.3
  * Requires PHP:      7.4
  * Author:            Answely
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const ANSWELY_VERSION = '1.5.0';
+const ANSWELY_VERSION = '1.5.1';
 const ANSWELY_OPTION  = 'answely';
 
 /**
@@ -693,6 +693,17 @@ function answely_admin_locale() {
  *
  * @return array{level:string, message:string, details:string[]}
  */
+/**
+ * Text of the "Last check" line under the connection check.
+ *
+ * @param int $time Unix time of the check.
+ * @return string
+ */
+function answely_last_check_text( $time ) {
+	/* translators: %s: date and time */
+	return sprintf( __( 'Last check: %s', 'answely' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $time ) );
+}
+
 function answely_check_connection() {
 	$e = answely_einstellungen();
 	if ( '' === $e['key'] ) {
@@ -783,6 +794,7 @@ function answely_check_connection() {
 	}
 	update_option( 'answely_status', $status, false );
 	$out['details'] = $details;
+	$out['checked'] = answely_last_check_text( $status['time'] );
 	return $out;
 }
 
@@ -1154,10 +1166,7 @@ function answely_tab_connection( array $e, array $service ) {
 	echo '<p>' . esc_html__( 'Asks Answely whether it answers for this site key. Does not use your answer quota.', 'answely' ) . '</p>';
 	echo '<p><button type="button" id="answely-check" class="button button-secondary" data-answely-action="check" aria-controls="answely-check-out"' . disabled( '' === $e['key'], true, false ) . '><span class="dashicons dashicons-update" aria-hidden="true"></span>' . esc_html__( 'Check connection', 'answely' ) . '</button></p>';
 	echo '<div id="answely-check-out" class="answely-result" role="status" hidden></div>';
-	if ( ! empty( $status['time'] ) ) {
-		/* translators: %s: date and time */
-		echo '<p class="description">' . esc_html( sprintf( __( 'Last check: %s', 'answely' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $status['time'] ) ) ) . '</p>';
-	}
+	echo '<p class="description" id="answely-last-check"' . ( empty( $status['time'] ) ? ' hidden' : '' ) . '>' . esc_html( empty( $status['time'] ) ? '' : answely_last_check_text( $status['time'] ) ) . '</p>';
 	echo '</div>';
 
 	echo '<div class="answely-card"><h2>' . esc_html__( 'Test question', 'answely' ) . '</h2>';

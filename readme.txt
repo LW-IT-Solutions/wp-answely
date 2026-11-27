@@ -4,7 +4,7 @@ Tags: search, ai, answers, site search, faq
 Requires at least: 6.3
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -94,6 +94,11 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 
 == Changelog ==
 
+= 1.5.1 =
+* Test question: source cards show the query part of the address too, so sites with plain permalinks no longer show only "/".
+* Connection: "Last check" shows the time of the check that just ran.
+* Content sync: content that was never sent and may not be sent (for example under an excluded path) no longer enters the queue.
+
 = 1.5.0 =
 * Setup: open steps link straight to the field, button or tab where they are done; the progress ring draws in once.
 * Test question: the answer shows time, number of sources and words, appears word by word and lists its sources as cards with their path. Questions asked on the page can be put back in the field with one click (nothing is stored).
@@ -137,6 +142,9 @@ All settings of the plugin are removed. Documents sent by the content sync stay 
 * First version: site key, consent mode, script tag in the page head.
 
 == Upgrade Notice ==
+
+= 1.5.1 =
+Fixes the source paths with plain permalinks, the "Last check" line and the queue for excluded content. No change to what is sent.
 
 = 1.5.0 =
 Visual help on the settings page: jump links, answer details, live preview, shortcode builder and a path test. No change to what is sent. Existing settings are kept.

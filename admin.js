@@ -268,7 +268,9 @@
 					tt.textContent = String( s.title || u );
 					var pa = d.createElement( 'span' );
 					pa.className = 'answely-src__path';
-					pa.textContent = new URL( u ).pathname;
+					var pu = new URL( u );
+					pa.textContent = pu.pathname + pu.search;
+					pa.title = u;
 					l.appendChild( ic );
 					l.appendChild( tt );
 					l.appendChild( pa );
@@ -363,6 +365,11 @@
 		if ( a === 'check' || a === 'index' || a === 'sync_now' ) {
 			post( 'answely_' + a, {}, out, b, function ( r ) {
 				showResult( out, r );
+				var lc = d.getElementById( 'answely-last-check' );
+				if ( a === 'check' && lc && r && r.checked ) {
+					lc.textContent = String( r.checked );
+					lc.hidden = false;
+				}
 			} );
 			return;
 		}

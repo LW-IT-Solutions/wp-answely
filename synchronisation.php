@@ -362,6 +362,14 @@ function answely_sync_vormerken( $id ) {
 		return;
 	}
 	$s['queue'] = isset( $s['queue'] ) && is_array( $s['queue'] ) ? $s['queue'] : array();
+	if ( empty( $s['gesendet'][ $id ] ) && ! answely_sync_oeffentlich( get_post( $id ) ) ) {
+		// Never sent and not sendable (excluded path, noindex, draft ...): nothing to send or withdraw.
+		if ( isset( $s['queue'][ $id ] ) ) {
+			unset( $s['queue'][ $id ] );
+			answely_sync_schreib( $s );
+		}
+		return;
+	}
 	if ( count( $s['queue'] ) >= ANSWELY_SYNC_MAX && ! isset( $s['queue'][ $id ] ) ) {
 		$s['fehler'] = 'queue_voll';
 		answely_sync_schreib( $s );
@@ -503,6 +511,9 @@ function answely_sync_arbeit() {
 			)
 		);
 		foreach ( $ids as $id ) {
+			if ( empty( $s['gesendet'][ (int) $id ] ) && ! answely_sync_oeffentlich( get_post( $id ) ) ) {
+				continue; // Not sendable and never sent: nothing to do.
+			}
 			if ( count( $s['queue'] ) >= ANSWELY_SYNC_MAX ) {
 				$s['fehler'] = 'queue_voll';
 				answely_sync_schreib( $s );
